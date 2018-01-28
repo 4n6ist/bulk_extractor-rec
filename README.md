@@ -26,9 +26,8 @@ sudo dnf install java-1.8.0-openjdk-devel
 ### Git
 
 ```
-git clone https://github.com/4n6ist/bulk_extractor.git
+git clone --recursive https://github.com/4n6ist/bulk_extractor-rec.git
 cd bulk_extractor
-git checkout dev-rec
 sh bootstrap.sh
 ```
 
