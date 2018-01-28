@@ -27,16 +27,25 @@ sudo dnf install java-1.8.0-openjdk-devel
 
 ```
 git clone --recursive https://github.com/4n6ist/bulk_extractor-rec.git
-cd bulk_extractor
-sh bootstrap.sh
+cd bulk_extractor-rec
 ```
 
 ## Build
+
+### Linux
+
+```
+sh bootstrap.sh
+./configure
+make
+sudo make install
+```
 
 ### Windows (exe)
 
 ```
 cd src_win
+chmod 755 CONFIGURE_F20.bash
 ./CONFIGURE_F20.bash
 make
 ```
@@ -61,13 +70,24 @@ cd ..
 make
 ```
 
-### Linux
+If you encounter a following error:
 
 ```
-./configure
-make
-sudo make install
+../../plugins/plugin_test.cpp:10:10: fatal error: be13_api/bulk_extractor_i.h: No such file or directory
+ #include "be13_api/bulk_extractor_i.h"  // from ../src/be13_api/bulk_extractor_i.h
 ```
+
+Then edit AM_CPPFLAGS variable in build_win64/plugins/Makefile
+
+```
+AM_CPPFLAGS = -I.. -I../src  -I../src/be13_api  -I$(top_srcdir)/src/\
+be13_api
+->
+AM_CPPFLAGS = -I.. -I../src -I../../src -I../src/be13_api  -I$(top_srcdir)/src/\
+be13_api
+```
+
+
 ## Documentation & Download
 
 Documentation and windows binary is available at https://www.kazamiya.net/bulk_extractor-rec/
