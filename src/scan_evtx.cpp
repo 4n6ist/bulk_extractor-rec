@@ -77,13 +77,13 @@ struct crc32 {
 };
 
 // check EVTX Header Signature
-// return: 1 - valid header and number of chunks, 0 - not header, -1 - valid header but invalid num of chunk 
+// return: > 0 - valid header and number of chunks, 0 - not header, -1 - valid header but invalid num of chunk 
 int64_t check_evtxheader_signature(size_t offset, const sbuf_t &sbuf) {
     int16_t num_of_chunks;  
     // \x45\x6c\x66\x46\x69\x6c\x65 ElfFile
     if (sbuf[offset] == 0x45 && sbuf[offset + 1] == 0x6c && sbuf[offset + 2] == 0x66 &&
         sbuf[offset + 3] == 0x46 && sbuf[offset + 4] == 0x69 && sbuf[offset + 5] == 0x6c &&
-        sbuf[offset + 6] == 0x65) {
+        sbuf[offset + 6] == 0x65 && sbuf[offset + 7] == 0x00) {
         if (sbuf[offset + 32] == 128 && sbuf.get16i(offset + 40) == 4096) {// Header Size and Header Block Size
             num_of_chunks = sbuf.get16i(offset + 42); // Number of Chunks
             if (num_of_chunks > 0)
@@ -102,7 +102,7 @@ int64_t check_evtxchunk_signature(size_t offset, const sbuf_t &sbuf) {
     // \x45\x6c\x66\x43\x68\x6e\x6b ElfChnk
     if (sbuf[offset] == 0x45 && sbuf[offset + 1] == 0x6c && sbuf[offset + 2] == 0x66 &&
         sbuf[offset + 3] == 0x43 && sbuf[offset + 4] == 0x68 && sbuf[offset + 5] == 0x6e &&
-        sbuf[offset + 6] == 0x6b) {
+        sbuf[offset + 6] == 0x6b && sbuf[offset + 7] == 0x00) {
         if (sbuf[offset + 40] == 128) { // Header Size
             last_record_id = sbuf.get64i(offset + 32); // Last Record ID
             if (last_record_id > 0)
@@ -117,13 +117,13 @@ int64_t check_evtxchunk_signature(size_t offset, const sbuf_t &sbuf) {
 // check EVTX Record Signature
 // return: > 0 - record size, 0 - not record, 
 int64_t check_evtxrecord_signature(size_t offset, const sbuf_t &sbuf) {
-    int32_t record_size;
+    int64_t record_size;
     // \x2a\x2a\x00\x00
     if (sbuf[offset] == 0x2a && sbuf[offset + 1] == 0x2a &&
         sbuf[offset + 2] == 0x00  && sbuf[offset + 3] == 0x00) {
-
         record_size = sbuf.get32i(offset + 4); // Size
-        if (record_size == sbuf[offset+record_size-4]) // Copy of size
+        if (record_size > 0 && record_size < ELFCHNK_SIZE
+	    && record_size == sbuf.get32i(offset+record_size-4)) // Copy of size
             return record_size;
     }
     return 0;
@@ -155,9 +155,7 @@ void scan_evtx(const class scanner_params &sp,const recursion_control_block &rcb
         size_t offset = 0;
         size_t stop = sbuf.pagesize;
         size_t total_size=0, i=0, num_chunks;
-        int64_t result_header_type, result_record_type;
-        int64_t result_type, result_chunk_type;
-        int64_t result_num_of_chunks, result_last_record_id;
+        int64_t result_record_size, result_num_of_chunks, result_last_record_id;
 
         while (offset < stop) {
             result_num_of_chunks = check_evtxheader_signature(offset, sbuf);
@@ -170,15 +168,18 @@ void scan_evtx(const class scanner_params &sp,const recursion_control_block &rcb
                     int32_t actual_num_of_chunk = 1;
                     total_size += ELFCHNK_SIZE;
                     result_last_record_id = check_evtxchunk_signature(offset+total_size, sbuf);
-                    while (result_last_record_id > 0) {
+                    while (result_last_record_id > 0 && offset+total_size < stop) {
                         ++actual_num_of_chunk;
                         total_size += ELFCHNK_SIZE;
                         result_last_record_id = check_evtxchunk_signature(offset+total_size, sbuf);
                     }
-                    std::string filename = sbuf.pos0.str() + "_valid_header_" +
+                    std::string filename = (sbuf.pos0+offset).str() + "_valid_header_" +
                         std::to_string(result_num_of_chunks) + "chunks_" + 
                         std::to_string(actual_num_of_chunk) + "actual.evtx";                
                     evtx_recorder->carve_records(sbuf, offset, total_size, filename);
+                } else if (result_last_record_id == -1) {
+                    // If valid ElfChnk and invalid record then skip
+                    total_size += ELFCHNK_SIZE;
                 }
                 offset += total_size;
                 continue;
@@ -190,7 +191,7 @@ void scan_evtx(const class scanner_params &sp,const recursion_control_block &rcb
                 int64_t last_record_id = result_last_record_id; 
                 total_size += ELFCHNK_SIZE;
                 result_last_record_id = check_evtxchunk_signature(offset+total_size, sbuf);
-                while (result_last_record_id != 0) {
+                while (result_last_record_id > 0 && offset+total_size < stop) {
                     last_record_id = result_last_record_id; 
                     ++last_chunk;
                     total_size += ELFCHNK_SIZE;
@@ -214,7 +215,7 @@ void scan_evtx(const class scanner_params &sp,const recursion_control_block &rcb
                 // CRC32 of the first 120 bytes == header.part struct
                 header.crc32 = crc32::update(table, 0, &header.part, 120); 
                 memset(header.unknown2,'\0', sizeof(header.unknown2));
-                std::string filename = sbuf.pos0.str() + "_" +
+                std::string filename = (sbuf.pos0+offset).str() + "_" +
                     std::to_string(header.part.number_of_chunks) + "chunks_" +
                     std::to_string(header.part.next_record) + "records.evtx";                
                 // generate evtx header based on elfchnk information
@@ -223,10 +224,10 @@ void scan_evtx(const class scanner_params &sp,const recursion_control_block &rcb
                 offset += total_size;
             } else { // scans orphan record
                 while (i < CLUSTER_SIZE) {
-                    result_type = check_evtxrecord_signature(offset+i, sbuf);
-                    if (result_type > 0) {
-                        evtx_recorder->carve_records(sbuf,offset,(size_t)result_type,"evtx_orphan_record");
-                        i += result_type;
+                    result_record_size = check_evtxrecord_signature(offset+i, sbuf);
+                    if (result_record_size > 0) {
+                        evtx_recorder->carve_records(sbuf,offset+i,result_record_size,"evtx_orphan_record");
+                        i += result_record_size;
                     } else {
                         i += 8;
                     }
@@ -234,7 +235,7 @@ void scan_evtx(const class scanner_params &sp,const recursion_control_block &rcb
                 }
                 offset += CLUSTER_SIZE;
                 i = 0;
-            }
+	    }
         } // end while
     } // end PHASE_SCAN
 }
