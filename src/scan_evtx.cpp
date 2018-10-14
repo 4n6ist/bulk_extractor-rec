@@ -186,13 +186,17 @@ void scan_evtx(const class scanner_params &sp,const recursion_control_block &rcb
             } 
             result_last_record_id = check_evtxchunk_signature(offset, sbuf);
             // ElfChnk
-            if (result_last_record_id != 0) {
+            if (result_last_record_id > 0) {
                 int32_t last_chunk = 0;
                 int64_t last_record_id = result_last_record_id; 
+                int64_t first_record_id = sbuf.get64i(offset + 24); // First Record ID
+                int64_t num_of_records = last_record_id - first_record_id +1;
                 total_size += ELFCHNK_SIZE;
                 result_last_record_id = check_evtxchunk_signature(offset+total_size, sbuf);
                 while (result_last_record_id > 0 && offset+total_size < stop) {
+                    first_record_id = sbuf.get64i(offset+ total_size + 24); // First Record ID
                     last_record_id = result_last_record_id; 
+                    num_of_records += last_record_id - first_record_id +1;
                     ++last_chunk;
                     total_size += ELFCHNK_SIZE;
                     result_last_record_id = check_evtxchunk_signature(offset+total_size, sbuf);
@@ -217,7 +221,7 @@ void scan_evtx(const class scanner_params &sp,const recursion_control_block &rcb
                 memset(header.unknown2,'\0', sizeof(header.unknown2));
                 std::string filename = (sbuf.pos0+offset).str() + "_" +
                     std::to_string(header.part.number_of_chunks) + "chunks_" +
-                    std::to_string(header.part.next_record) + "records.evtx";                
+                    std::to_string(num_of_records) + "records.evtx";                
                 // generate evtx header based on elfchnk information
                 evtx_recorder->write_data((unsigned char *)&header,sizeof(elffile),filename);
                 evtx_recorder->carve_records(sbuf, offset, total_size, filename);
