@@ -1,7 +1,8 @@
 /**
  * Plugin: scan_ntfsusn
- * Purpose: Find all USN_RECORD v2/v4 record into one file
+ * Purpose: Find all USN_RECORD v2/v3/v4 record into one file
  * USN_RECORD_V2 format https://msdn.microsoft.com/ja-jp/library/windows/desktop/aa365722(v=vs.85).aspx
+ * USN_RECORD_V3 format https://msdn.microsoft.com/en-us/library/dn366287.aspx
  * USN_RECORD_V4 format https://msdn.microsoft.com/ja-jp/library/windows/desktop/mt684964(v=vs.85).aspx
  **/
 #include "config.h"
@@ -40,6 +41,20 @@ size_t check_usnrecordv2_signature(size_t offset, const sbuf_t &sbuf) {
     return 0;
 }
 
+size_t check_usnrecordv3_signature(size_t offset, const sbuf_t &sbuf) {
+    size_t record_size;
+    if (sbuf[offset + 2] == 0x00 && sbuf[offset + 3] == 0x00 && sbuf[offset + 4] == 0x03 
+        && sbuf[offset + 5] == 0x00 && sbuf[offset + 6] == 0x00 && sbuf[offset + 7] == 0x00
+        && sbuf[offset + 74] == 0x4c && sbuf[offset + 75] == 0x00) {
+        record_size = sbuf.get16i(offset);
+        if (record_size >= 64 && record_size <= 600)
+            return record_size;
+        else
+            return 0;
+    }
+    return 0;
+}
+
 size_t check_usnrecordv4_signature(size_t offset, const sbuf_t &sbuf) {
     size_t record_size;
     if (sbuf[offset + 2] == 0x00 && sbuf[offset + 3] == 0x00 && sbuf[offset + 4] == 0x04 
@@ -54,9 +69,52 @@ size_t check_usnrecordv4_signature(size_t offset, const sbuf_t &sbuf) {
     return 0;
 }
 
+size_t check_usnrecordv2_or_v3_signature(size_t offset, const sbuf_t &sbuf) {
+    size_t record_size;
+    record_size = check_usnrecordv2_signature(offset, sbuf);
+    if (record_size != 0)
+        return record_size;
+
+    record_size = check_usnrecordv3_signature(offset, sbuf);
+    if (record_size != 0)
+        return record_size;
+
+    return 0;
+}
+
 size_t check_usnrecordv2_or_v4_signature(size_t offset, const sbuf_t &sbuf) {
     size_t record_size;
     record_size = check_usnrecordv2_signature(offset, sbuf);
+    if (record_size != 0)
+        return record_size;
+
+    record_size = check_usnrecordv4_signature(offset, sbuf);
+    if (record_size != 0)
+        return record_size;
+
+    return 0;
+}
+
+size_t check_usnrecordv3_or_v4_signature(size_t offset, const sbuf_t &sbuf) {
+    size_t record_size;
+    record_size = check_usnrecordv3_signature(offset, sbuf);
+    if (record_size != 0)
+        return record_size;
+
+    record_size = check_usnrecordv4_signature(offset, sbuf);
+    if (record_size != 0)
+        return record_size;
+
+    return 0;
+}
+
+size_t check_usnrecordv2_or_v3_or_v4_signature(size_t offset, const sbuf_t &sbuf) {
+    size_t record_size;
+    record_size = check_usnrecordv2_signature(offset, sbuf);
+    if (record_size != 0)
+        return record_size;
+
+    record_size = check_usnrecordv3_signature(offset, sbuf);
     if (record_size != 0)
         return record_size;
 
@@ -76,7 +134,7 @@ void scan_ntfsusn(const class scanner_params &sp,const recursion_control_block &
         assert(sp.info->si_version==scanner_info::CURRENT_SI_VERSION);
         sp.info->name            = "ntfsusn";
         sp.info->author          = "Teru Yamazaki";
-        sp.info->description     = "Scans for USN_RECORD v2/v4 record";
+        sp.info->description     = "Scans for USN_RECORD v2/v3/v4 record";
         sp.info->scanner_version = "1.0";
         sp.info->feature_names.insert(FEATURE_FILE_NAME);
         //        sp.info->get_config("ntfsusn_carve_mode",&ntfsusn_carve_mode,"0=carve none; 1=carve encoded; 2=carve all");
@@ -95,9 +153,9 @@ void scan_ntfsusn(const class scanner_params &sp,const recursion_control_block &
         size_t record_size=0;
         size_t total_record_size=0;
 
-        // search for USN_RECORD_V2 Structure in the sbuf
+        // search for USN_RECORD_V2/USN_RECORD_V3 Structure in the sbuf
         while (offset < stop) {
-            record_size = check_usnrecordv2_signature(offset,sbuf);
+            record_size = check_usnrecordv2_or_v3_signature(offset,sbuf);
             if (record_size == 0) {	      
                 offset += 8; // because of USN_RECORD stored at 8 byte boundary
                 continue;
@@ -119,7 +177,7 @@ void scan_ntfsusn(const class scanner_params &sp,const recursion_control_block &
             }
             // found one record then also checks following valid records and writes all at once 
             while (true) {
-                record_size = check_usnrecordv2_or_v4_signature(offset+total_record_size,sbuf);
+                record_size = check_usnrecordv2_or_v3_or_v4_signature(offset+total_record_size,sbuf);
                 if (record_size % 8 != 0) // illegal size and stop process
 		            break;
                 if (record_size > 0) {
@@ -135,7 +193,7 @@ void scan_ntfsusn(const class scanner_params &sp,const recursion_control_block &
                     if ((offset+total_record_size) % SECTOR_SIZE != 0) {
                         size_t next_boundary_offset;
                         next_boundary_offset = offset + total_record_size + SECTOR_SIZE - ((offset+total_record_size) % SECTOR_SIZE);
-                        record_size = check_usnrecordv2_or_v4_signature(next_boundary_offset,sbuf);
+                        record_size = check_usnrecordv2_or_v3_or_v4_signature(next_boundary_offset,sbuf);
                         if (record_size > 0 && record_size % 8 == 0 && offset+total_record_size+record_size < stop ) {
                             total_record_size = next_boundary_offset - offset;
                             continue;
