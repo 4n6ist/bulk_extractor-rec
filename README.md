@@ -2,10 +2,11 @@
 
 It is based on [bulk_extrator](https://github.com/simsong/bulk_extractor) and supports following scanner: 
 
+* evtx - EVTX file and EVTX chunks (with generated file header)
 * ntfsindx - $INDEX_ALLOCATION record (INDX)
 * ntfslogfile - $LogFile record (RSTR/RCRD)
 * ntfsmft - $MFT record (FILE)
-* ntfsusn - $UsnJrnl:$J record (USN_RECORD_V2/V4) 
+* ntfsusn - $UsnJrnl:$J record (USN_RECORD_V2/V3/V4) 
 * utmp - wtmp/btmp record (utmp)
 
 ## Ready to build
