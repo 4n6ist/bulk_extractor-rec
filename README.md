@@ -11,7 +11,7 @@ It is based on [bulk_extrator](https://github.com/simsong/bulk_extractor) and su
 
 ## Ready to build
 
-The following procedure works on Fedora 26 or above.
+The following procedure works on Fedora 31 or above.
 
 ### Install required package
 
@@ -67,7 +67,7 @@ cd libewf-########
 make
 sudo make install
 cd ..
-./CONFIGURE_F20.bash
+./CONFIGURE_F31.bash
 make
 ```
 
