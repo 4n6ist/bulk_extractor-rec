@@ -8,7 +8,7 @@ cat <<EOF
 This script will configure a fresh Fedora system to compile with
 mingw64.  Please perform the following steps:
 
-1. Install F20 or newer, running with you as an administrator.
+1. Install FEDORA31 or newer, running with you as an administrator.
    For a VM:
 
    1a - download the ISO for the 64-bit DVD (not the live media) from:
@@ -24,6 +24,7 @@ press any key to continue...
 EOF
 read
 
+MAKE_CONCURRENCY=-j4
 # cd to the directory where the script is
 # http://stackoverflow.com/questions/59895/can-a-bash-script-tell-what-directory-its-stored-in
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
@@ -43,7 +44,7 @@ for i in $NEEDED_FILES ; do
   fi
 done
 
-MPKGS="autoconf automake flex gcc gcc-c++ git libtool "
+MPKGS="autoconf automake make flex gcc gcc-c++ git libtool "
 MPKGS+="md5deep osslsigncode patch wine wget bison zlib-devel "
 MPKGS+="libewf libewf-devel java-1.8.0-openjdk-devel "
 MPKGS+="libxml2-devel libxml2-static openssl-devel "
@@ -56,16 +57,20 @@ if [ ! -r /etc/redhat-release ]; then
   exit 1
 fi
 
-if grep 'Fedora.release.' /etc/redhat-release ; then
-  echo Fedora Release detected
-else
-  echo This script is only tested for Fedora Release 20 and should work on F20 or newer.
-  exit 1
+. /etc/os-release
+if [ $ID != 'fedora' ]; then
+    echo This requires Fedora Linux. You have $ID.
+    exit 1
+fi
+
+if [ $VERSION_ID -ne 31 ]; then
+    echo This requires version 31 of $ID. You have $VERSION_ID. 
+    exit 1
 fi
 
 echo Will now try to install 
 
-sudo yum install -y $MPKGS --skip-broken
+sudo yum install -y $MPKGS --skip-broken 2>&1 | grep -v "is already installed"
 if [ $? != 0 ]; then
   echo "Could not install some of the packages. Will not proceed."
   exit 1
@@ -81,11 +86,11 @@ for lib in zlib gettext boost cairo pixman freetype fontconfig \
     bzip2 expat winpthreads libgnurx libxml2 iconv openssl sqlite ; do
   INST+=" mingw64-${lib} mingw64-${lib}-static"
 done
-sudo yum -y install $INST
+sudo yum -y install $INST 2>&1 | grep -v "is already installed"
 
 echo 
 echo "Now performing a yum update to update system packages"
-sudo yum -y update
+sudo yum -y update  2>&1 | grep -v "is already installed"
 
 MINGW64=x86_64-w64-mingw32
 
@@ -104,40 +109,44 @@ function is_installed {
   fi
 }
     
-# usage: build_mingw <name> <download-URL> <filename-downloaded>
+# usage: build_mingw <name> <download-URL> 
 function build_mingw {
-  LIB=$1
-  URL=$2
-  FILE=$3
-  if is_installed $LIB
-  then
-    echo $LIB already installed. Skipping
-  else
-    echo Building $1 from $URL
-    if [ ! -r $FILE ]; then
-      wget --content-disposition $URL
+    LIB=$1
+    URL=$2
+    FILE=`basename $2`
+    if is_installed $LIB; then
+	echo $LIB already installed. Skipping
+    else
+	echo Building $LIB from $URL from $FILE.
+	if [ ! -r $FILE ]; then
+	    echo wget --content-disposition $URL
+	    wget --content-disposition $URL
+	fi
+	if [ ! -r $FILE ]; then
+	    echo $FILE did not download from $URL.
+	    exit 1
+	fi
+	tar xvf $FILE
+	# Now get the directory that it unpacked into
+	DIR=`tar tf $FILE |head -1`
+	pushd $DIR
+	echo
+	echo %%% $LIB mingw64
+	if [ ! -r configure -a -r bootstrap.sh ]; then
+	    . bootstrap.sh
+	fi
+	CPPFLAGS=-DHAVE_LOCAL_LIBEWF mingw64-configure --enable-static --disable-shared
+	make clean
+	make $MAKE_CONCURRENCY
+	sudo make install
+	make clean
+	popd
+	rm -rf $DIR
     fi
-    tar xvf $FILE
-    # Now get the directory that it unpacked into
-    DIR=`tar tf $FILE |head -1`
-    pushd $DIR
-    echo
-    echo %%% $LIB mingw64
-    if [ ! -r configure -a -r bootstrap.sh ]; then
-      . bootstrap.sh
-    fi
-    CPPFLAGS=-DHAVE_LOCAL_LIBEWF mingw64-configure --enable-static --disable-shared
-    make clean
-    make
-    sudo make install
-    make clean
-    popd
-    rm -rf $DIR
-  fi
 }
 
-build_mingw libtre   http://laurikari.net/tre/tre-0.8.0.tar.gz   tre-0.8.0.tar.gz
-build_mingw libewf   https://github.com/libyal/legacy/raw/master/libewf/libewf-20140608.tar.gz libewf-20140608.tar.gz
+build_mingw libtre   http://laurikari.net/tre/tre-0.8.0.tar.gz   
+build_mingw libewf   https://github.com/libyal/libewf/releases/download/20171104/libewf-experimental-20171104.tar.gz 
 
 #
 # ICU requires patching and a special build sequence
@@ -200,9 +209,9 @@ fi
 
 #
 # build liblightgrep
-#
+# --- currently disabled, as there is no lightgrep release at https://github.com/strozfriedberg/lightgrep/releases
+# build_mingw liblightgrep  https://github.com/LightboxTech/liblightgrep/archive/v1.3.0.tar.gz  liblightgrep-1.3.0.tar.gz
 
-build_mingw liblightgrep  https://github.com/LightboxTech/liblightgrep/archive/v1.3.0.tar.gz  liblightgrep-1.3.0.tar.gz
 
 #
 #

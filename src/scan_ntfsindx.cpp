@@ -2,6 +2,7 @@
  * Plugin: scan_ntfsindx
  * Purpose: Find all $INDEX_ALLOCATION INDX record into one file
  * Reference: http://www.digital-evidence.org/fsfa/
+ * Teru Yamazaki(@4n6ist) - https://github.com/4n6ist/bulk_extractor-rec 
  **/
 #include "config.h"
 #include "be13_api/bulk_extractor_i.h"
@@ -60,10 +61,6 @@ int8_t check_indxrecord_signature(size_t offset, const sbuf_t &sbuf) {
 // determine type of INDX
 // return: 1 - FILENAME INDX record, 2 - ObjId-O INDX record, 0 - Other INDX record (Secure-SDH, Secure-SII, etc.)
 int8_t check_indxrecord_type(size_t offset, const sbuf_t &sbuf) {
-    int16_t fixup_offset;
-    int16_t fixup_count;
-    int16_t fixup_value;
-    int16_t i;
 
     // 4 FILETIME pattern
     if (sbuf[offset + 95] == 0x01 && sbuf[offset + 103] == 0x01 &&

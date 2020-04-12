@@ -2,6 +2,7 @@
  * Plugin: scan_ntfsmft
  * Purpose: Find all MFT file record into one file
  * Reference: http://www.digital-evidence.org/fsfa/
+ * Teru Yamazaki(@4n6ist) - https://github.com/4n6ist/bulk_extractor-rec
  **/
 #include "config.h"
 #include "be13_api/bulk_extractor_i.h"
@@ -33,7 +34,6 @@ int8_t check_mftrecord_signature(size_t offset, const sbuf_t &sbuf) {
     int16_t fixup_offset;
     int16_t fixup_count;
     int16_t fixup_value;
-    int16_t i;
 
     if (sbuf[offset] == 0x46 && sbuf[offset + 1] == 0x49 &&
         sbuf[offset + 2] == 0x4c  && sbuf[offset + 3] == 0x45) {
@@ -47,7 +47,7 @@ int8_t check_mftrecord_signature(size_t offset, const sbuf_t &sbuf) {
 
         fixup_value = sbuf.get16i(offset + fixup_offset);
 
-        for(i=1;i<fixup_count;i++){
+        for(int i=1;i<fixup_count;i++){
             if (fixup_value != sbuf.get16i(offset + (SECTOR_SIZE * i) - 2))
                 return 2;
         }

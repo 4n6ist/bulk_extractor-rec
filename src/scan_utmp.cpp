@@ -2,6 +2,7 @@
  * Plugin: scan_utmp
  * Purpose: Find all utmp record into one file
  * Reference: http://man7.org/linux/man-pages/man5/utmp.5.html
+ * Contributed by https://github.com/4n6ist/bulk_extractor-rec 
  **/
 #include "config.h"
 #include "be13_api/bulk_extractor_i.h"
@@ -28,9 +29,7 @@ using namespace std;
 
 bool check_utmprecord_signature(size_t offset, const sbuf_t &sbuf) {
     int ut_type; // defined as short at man page but I have seen 4 byte type on real system
-    int ut_pid;
     char line, user, host;    
-    int i, j;
 
     ut_type = sbuf.get32i(offset);
     if(ut_type < 1 || ut_type > 8) // not search for ut_type 0 'UT_UNKNOWN' and 9 "ACCOUNTING"
@@ -39,18 +38,18 @@ bool check_utmprecord_signature(size_t offset, const sbuf_t &sbuf) {
     line = sbuf[offset+8];
     if (line != 0 && (line < 32 || line > 126))
         return false;
-    for (i=0; i<32; i++)
+    for (int i=0; i<32; i++)
         if (sbuf[offset+8+i] == 0) // 0x00 found then it should be continued 0x00 at the end of string
-            for (j=0; j<32-i; j++)
+            for (int j=0; j<32-i; j++)
                 if (sbuf[offset+8+i+j] != 0)
                     return false;
 
     user = sbuf[offset+44];
     if (user != 0 && (user < 32 || user > 126))
         return false;
-    for (i=0; i<32; i++)
+    for (int i=0; i<32; i++)
         if (sbuf[offset+44+i] == 0) // 0x00 found then it should be continued 0x00 at the end of string
-            for (j=0; j<32-i; j++)
+            for (int j=0; j<32-i; j++)
                 if (sbuf[offset+44+i+j] != 0)
                     return false;
 
@@ -59,9 +58,9 @@ bool check_utmprecord_signature(size_t offset, const sbuf_t &sbuf) {
         && host != 33 && host != 37 && host != 60 && host != 62 && host != 92
         && host != 94 && host != 123 && host != 124 && host != 125) // use RFC3986 for soft restriction 
         return false;
-    for (i=0; i<256; i++)
+    for (int i=0; i<256; i++)
         if (sbuf[offset+76+i] == 0) // 0x00 found then it should be continued 0x00 at the end of string
-            for (j=0; j<256-i; j++)
+            for (int j=0; j<256-i; j++)
                 if (sbuf[offset+76+i+j] != 0)
                     return false;
 
@@ -71,7 +70,7 @@ bool check_utmprecord_signature(size_t offset, const sbuf_t &sbuf) {
     if (sbuf.get32i(offset+344) < 0 || sbuf.get32i(offset+344) >= 1000000) //tv_usec
         return false;
 
-    for (i=0; i<20; i++) { 
+    for (int i=0; i<20; i++) { 
         if (sbuf[offset+364+i] != 0) // unused
             return false;
     }                   

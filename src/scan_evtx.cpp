@@ -2,6 +2,7 @@
  * Plugin: scan_evtx
  * Purpose: Find all of evtx component, carve out and reconstruct evtx file
  * Reference: https://github.com/libyal/libevtx/blob/master/documentation/Windows%20XML%20Event%20Log%20(EVTX).asciidoc
+ * Teru Yamazaki(@4n6ist) - https://github.com/4n6ist/bulk_extractor-rec 
  **/
 #include "config.h"
 #include "be13_api/bulk_extractor_i.h"
@@ -55,7 +56,7 @@ struct elffile {
 struct crc32 {
     static void generate_table(uint32_t(&table)[256]) {
         uint32_t polynomial = 0xEDB88320;
-		for (uint32_t i = 0; i < 256; i++) {
+		for (size_t i = 0; i < 256; i++) {
 			uint32_t c = i;
 			for (size_t j = 0; j < 8; j++) {
 				if (c & 1)
@@ -81,9 +82,14 @@ struct crc32 {
 int64_t check_evtxheader_signature(size_t offset, const sbuf_t &sbuf) {
     int16_t num_of_chunks;  
     // \x45\x6c\x66\x46\x69\x6c\x65 ElfFile
-    if (sbuf[offset] == 0x45 && sbuf[offset + 1] == 0x6c && sbuf[offset + 2] == 0x66 &&
-        sbuf[offset + 3] == 0x46 && sbuf[offset + 4] == 0x69 && sbuf[offset + 5] == 0x6c &&
-        sbuf[offset + 6] == 0x65 && sbuf[offset + 7] == 0x00) {
+    if (sbuf[offset] == 0x45 &&
+        sbuf[offset + 1] == 0x6c &&
+        sbuf[offset + 2] == 0x66 &&
+        sbuf[offset + 3] == 0x46 &&
+        sbuf[offset + 4] == 0x69 &&
+        sbuf[offset + 5] == 0x6c &&
+        sbuf[offset + 6] == 0x65 &&
+        sbuf[offset + 7] == 0x00) {
         if (sbuf[offset + 32] == 128 && sbuf.get16i(offset + 40) == 4096) {// Header Size and Header Block Size
             num_of_chunks = sbuf.get16i(offset + 42); // Number of Chunks
             if (num_of_chunks > 0)
@@ -100,9 +106,14 @@ int64_t check_evtxheader_signature(size_t offset, const sbuf_t &sbuf) {
 int64_t check_evtxchunk_signature(size_t offset, const sbuf_t &sbuf) {
     int64_t last_record_id;
     // \x45\x6c\x66\x43\x68\x6e\x6b ElfChnk
-    if (sbuf[offset] == 0x45 && sbuf[offset + 1] == 0x6c && sbuf[offset + 2] == 0x66 &&
-        sbuf[offset + 3] == 0x43 && sbuf[offset + 4] == 0x68 && sbuf[offset + 5] == 0x6e &&
-        sbuf[offset + 6] == 0x6b && sbuf[offset + 7] == 0x00) {
+    if (sbuf[offset] == 0x45 &&
+        sbuf[offset + 1] == 0x6c &&
+        sbuf[offset + 2] == 0x66 &&
+        sbuf[offset + 3] == 0x43 &&
+        sbuf[offset + 4] == 0x68 &&
+        sbuf[offset + 5] == 0x6e &&
+        sbuf[offset + 6] == 0x6b &&
+        sbuf[offset + 7] == 0x00) {
         if (sbuf[offset + 40] == 128) { // Header Size
             last_record_id = sbuf.get64i(offset + 32); // Last Record ID
             if (last_record_id > 0)
@@ -119,8 +130,10 @@ int64_t check_evtxchunk_signature(size_t offset, const sbuf_t &sbuf) {
 int64_t check_evtxrecord_signature(size_t offset, const sbuf_t &sbuf) {
     int64_t record_size;
     // \x2a\x2a\x00\x00
-    if (sbuf[offset] == 0x2a && sbuf[offset + 1] == 0x2a &&
-        sbuf[offset + 2] == 0x00  && sbuf[offset + 3] == 0x00) {
+    if (sbuf[offset] == 0x2a &&
+        sbuf[offset + 1] == 0x2a &&
+        sbuf[offset + 2] == 0x00 &&
+        sbuf[offset + 3] == 0x00) {
         record_size = sbuf.get32i(offset + 4); // Size
         if (record_size > 0 && record_size < ELFCHNK_SIZE
 	    && record_size == sbuf.get32i(offset+record_size-4)) // Copy of size
@@ -154,11 +167,12 @@ void scan_evtx(const class scanner_params &sp,const recursion_control_block &rcb
         // search for EVTX chunk in the sbuf
         size_t offset = 0;
         size_t stop = sbuf.pagesize;
-        size_t total_size=0, i=0, num_chunks;
-        int64_t result_record_size, result_num_of_chunks, result_last_record_id;
+        size_t total_size=0;
 
         while (offset < stop) {
-            result_num_of_chunks = check_evtxheader_signature(offset, sbuf);
+            int64_t result_num_of_chunks = check_evtxheader_signature(offset, sbuf);
+            int64_t result_last_record_id = 0;
+            int64_t last_record_id;
             // ElfFile
             if (result_num_of_chunks > 0) {
                 total_size = ELFFILE_SIZE;
@@ -188,7 +202,7 @@ void scan_evtx(const class scanner_params &sp,const recursion_control_block &rcb
             // ElfChnk
             if (result_last_record_id > 0) {
                 int32_t last_chunk = 0;
-                int64_t last_record_id = result_last_record_id; 
+                last_record_id = result_last_record_id; 
                 int64_t first_record_id = sbuf.get64i(offset + 24); // First Record ID
                 int64_t num_of_records = last_record_id - first_record_id +1;
                 total_size += ELFCHNK_SIZE;
@@ -227,8 +241,9 @@ void scan_evtx(const class scanner_params &sp,const recursion_control_block &rcb
                 evtx_recorder->carve_records(sbuf, offset, total_size, filename);
                 offset += total_size;
             } else { // scans orphan record
+                size_t i=0;
                 while (i < CLUSTER_SIZE) {
-                    result_record_size = check_evtxrecord_signature(offset+i, sbuf);
+                    int64_t result_record_size = check_evtxrecord_signature(offset+i, sbuf);
                     if (result_record_size > 0) {
                         evtx_recorder->carve_records(sbuf,offset+i,result_record_size,"evtx_orphan_record");
                         i += result_record_size;
@@ -238,7 +253,6 @@ void scan_evtx(const class scanner_params &sp,const recursion_control_block &rcb
 
                 }
                 offset += CLUSTER_SIZE;
-                i = 0;
 	    }
         } // end while
     } // end PHASE_SCAN
