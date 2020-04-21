@@ -4,11 +4,9 @@
 [submodule "src/aff4"]
 	path = src/aff4
 	url = https://github.com/google/aff4.git
-[submodule "be13_api"]
-	path = be13_api
+[submodule "src/be13_api"]
+	path = src/be13_api
 	url = https://github.com/simsong/be13_api.git
-	branch = 5dee606a2002013fc0e3257725149d7fbf5bcc4f
-[submodule "dfxml"]
-	path = dfxml
+[submodule "src/dfxml"]
+	path = src/dfxml
 	url = https://github.com/simsong/dfxml.git
-	branch = b080f43fa108983a1f612e5b9107e6b3203ee4ae
