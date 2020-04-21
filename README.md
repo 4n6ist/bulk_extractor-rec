@@ -1,6 +1,6 @@
 # Bulk Extractor with Record Carving (bulk_extractor-rec)
 
-**This repository is based on [bulk_extrator](https://github.com/simsong/bulk_extractor), and specialized in developing record carving scanners. Stable scanners in this repository have been committed to official repository. If you need stable version, I recommend to get from official [bulk_extrator](https://github.com/simsong/bulk_extractor).**
+**This repository is based on [bulk_extractor](https://github.com/simsong/bulk_extractor), and specialized in developing record carving scanners. Stable scanners in this repository have been committed to official repository. If you need stable version, I recommend to get from official [bulk_extractor](https://github.com/simsong/bulk_extractor).**
 
 Current scanners I have developed: 
 * evtx - EVTX file and EVTX chunks (with generated file header)
