@@ -14,7 +14,7 @@
 # NOTE 3: This makefile is not automatically configured. If it were, then 'make distclean' 
 # would wipe it.
 
-BEVERSION:=`grep ^AC_INIT ../configure.ac | awk -F, '{print $$2;}' | sed 's/ //'`
+BEVERSION=`grep ^AC_INIT ../configure.ac | awk -F, '{print $$2;}' | sed 's/ //'`
 
 INSTALLER=bulk_extractor-$(BEVERSION)-windowsinstaller.exe
 
@@ -34,9 +34,6 @@ SRC_WIN_DIST = \
 	$(SRC_WIN)build_installer.nsi \
 	$(SRC_WIN)icu4c-53_1-mingw-w64-mkdir-compatibility.patch \
 	$(SRC_WIN)icu4c-53_1-simpler-crossbuild.patch
-
-zipfile: 
-	zip bulk_extractor-$(BEVERSION).zip $(SRC_WIN)bulk_extractor.exe bulk_extractor-$(BEVERSION)-windowsinstaller.exe 
 
 # The prerequisites for the installer can't be listed after the colon, 
 # becuase then the system will try to generate them simultaneously,
@@ -162,4 +159,6 @@ SUFFIXES = .txt .1
 .1.txt:
 	/usr/bin/tbl $< | /usr/bin/groff -S -Wall -mtty-char -mandoc -Tascii | /usr/bin/col -bx > $@
 
+zipfile: 
+	zip bulk_extractor-$(BEVERSION).zip $(SRC_WIN)bulk_extractor.exe bulk_extractor-$(BEVERSION)-windowsinstaller.exe 
 

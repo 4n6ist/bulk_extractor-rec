@@ -7,7 +7,7 @@
 # and http://www.openismus.com/documents/linux/automake/automake.shtml
 
 AC_PREREQ(2.57)
-AC_INIT(BULK_EXTRACTOR-REC, 1.6.0-dev-rec04beta, https://github.com/4n6ist/bulk_extractor-rec)
+AC_INIT(BULK_EXTRACTOR-REC, 1.6.0-rec04beta, https://github.com/4n6ist/bulk_extractor-rec)
 
 AC_CONFIG_MACRO_DIR(m4)
 
@@ -65,7 +65,7 @@ if test "x$use_BEViewer" == "xyes"; then
     if test x"$has_javac" == "xtrue" ; then
       # javac must be version 6 or later, indicated by the minor number
       javac_version=`javac -version 2>&1`
-      javac_minor=`echo "$javac_version" | sed -e 's/javac 1\.//' | sed -e 's/\..*//'`
+      javac_minor=`echo "$javac_version" | sed -e 's/javac //' | sed -e 's/^1\.//' | sed -e 's/\..*//'`
       if test $javac_minor ; then
         if test $javac_minor -lt "6" ; then
           has_javac=false
@@ -403,6 +403,9 @@ if test x"$hashdb" == x"yes" ; then
 fi
 if test x"$hashdb" == xyes ; then
   AC_DEFINE(HAVE_HASHDB,1,[define 1 to build the hashdb scanner])
+  if [[ $(hashdb -v | cut -d' ' -f2) == "3.1.0" ]]; then
+    AC_DEFINE(HAVE_HASHDB_3_1,1,[using hashdb-3.1.0 version])
+  fi
 else
   AC_MSG_NOTICE([the hashdb scanner will not be built])
 fi
