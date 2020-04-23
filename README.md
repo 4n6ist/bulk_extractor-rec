@@ -47,50 +47,10 @@ sudo make install
 
 ```
 cd src_win
-chmod 755 CONFIGURE_F20.bash
-./CONFIGURE_F20.bash
-make
-```
-
-If you encounter an error at libewf when you run CONFIGURE_F20.bash , then edit libewf-########/libuna/libuna_extern.h
-
-```
-(Line 44)
-#define LIBUNA_EXTERN /* extern */
-->
-#define LIBUNA_EXTERN extern
-```
-
-Then try to build/install libewf and run CONFIGURE_F20.bash again.
-
-```
-cd libewf-########
-make
-sudo make install
-cd ..
 ./CONFIGURE_F31.bash
 make
 ```
 
-If you encounter a following error:
-
-```
-../../plugins/plugin_test.cpp:10:10: fatal error: be13_api/bulk_extractor_i.h: No such file or directory
- #include "be13_api/bulk_extractor_i.h"  // from ../src/be13_api/bulk_extractor_i.h
-```
-
-Then edit AM_CPPFLAGS variable in build_win64/plugins/Makefile
-
-```
-AM_CPPFLAGS = -I.. -I../src  -I../src/be13_api  -I$(top_srcdir)/src/\
-be13_api
-->
-AM_CPPFLAGS = -I.. -I../src -I../../src -I../src/be13_api  -I$(top_srcdir)/src/\
-be13_api
-```
-
-
 ## Documentation & Download
 
-Documentation and windows binary is available at https://www.kazamiya.net/bulk_extractor-rec/
-
+Documentation for record carving and binary are available at https://www.kazamiya.net/bulk_extractor-rec/
